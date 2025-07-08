@@ -1,0 +1,179 @@
+@charset "UTF-8";
+
+body {
+    margin: 0;
+    /* overflow: hidden; を削除または変更して、必要に応じてスクロールを許可 */
+    overflow: hidden; /* 基本はhiddenのままにしますが、極端に小さい画面ではみ出たら検討 */
+    background-color: #333;
+    display: flex;
+    flex-direction: column; /* 要素を縦に並べるために変更 */
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Press Start 2P', cursive;
+    color: white;
+    position: relative;
+    padding: 10px; /* 全体に少し余白を追加 */
+    box-sizing: border-box; /* paddingを要素の幅と高さに含める */
+}
+
+canvas {
+    background-color: skyblue;
+    border: 2px solid #fff;
+    display: block;
+    /* 画面サイズに収まるように追加 */
+    max-width: 100%; /* 親要素の幅を超えないようにする */
+    max-height: calc(100vh - 100px); /* 画面の高さからUI要素分のスペースを引く */
+    width: auto; /* max-heightに基づいて幅を自動調整 */
+    height: auto; /* max-widthに基づいて高さを自動調整 */
+    object-fit: contain; /* アスペクト比を維持して要素内に収める */
+}
+
+#gameUI {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: flex;
+    gap: 20px;
+    font-size: 1.5em;
+    z-index: 10;
+}
+
+/* Start Screen Styles */
+#startScreen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 30px;
+    z-index: 30; /* Ensure it's on top */
+}
+
+#startScreen h1 {
+    font-size: 3em;
+    color: #ffd700;
+    text-shadow: 4px 4px #8b0000;
+    margin-bottom: 20px;
+}
+
+#startScreen button {
+    padding: 15px 30px;
+    font-size: 1.8em;
+    cursor: pointer;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    transition: background-color 0.3s ease, transform 0.1s ease;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+#startScreen button:hover {
+    background-color: #45a049;
+    transform: translateY(-2px);
+}
+
+#startScreen button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+
+
+/* Game Over Screen Styles */
+#gameOverScreen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    z-index: 20;
+}
+
+#gameOverScreen h1 {
+    font-size: 3em;
+    color: #ff4500;
+    text-shadow: 4px 4px #8b0000;
+}
+
+#gameOverScreen button {
+    padding: 12px 25px;
+    font-size: 1.5em;
+    cursor: pointer;
+    background-color: #f44336;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    transition: background-color 0.3s ease, transform 0.1s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+#gameOverScreen button:hover {
+    background-color: #da190b;
+    transform: translateY(-2px);
+}
+
+#gameOverScreen button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* 画面の状態に応じて表示/非表示を切り替えるためのクラス */
+.hidden {
+    display: none !important;
+}
+
+/* Control Buttons (新しい追加) */
+#controls {
+    position: absolute;
+    bottom: 20px; /* 画面下からの位置 */
+    width: 100%;
+    display: flex;
+    justify-content: space-around; /* D-padとジャンプボタンの間にスペースを均等に配分 */
+    align-items: flex-end; /* 下揃え */
+    padding: 0 20px;
+    box-sizing: border-box;
+    z-index: 50; /* 他のUIよりも手前に表示 */
+}
+
+#dpad {
+    display: flex;
+    gap: 10px; /* 左右ボタン間のスペース */
+}
+
+.control-button {
+    background-color: #555;
+    color: white;
+    border: none;
+    padding: 15px 25px;
+    font-size: 1.5em;
+    cursor: pointer;
+    border-radius: 8px;
+    opacity: 0.8;
+    transition: opacity 0.2s ease, transform 0.1s ease;
+    min-width: 80px; /* ボタンの最小幅を確保 */
+    text-align: center;
+    user-select: none; /* テキスト選択を防止 */
+    -webkit-tap-highlight-color: transparent; /* タップ時のハイライトを無効化 */
+}
+
+.control-button:active {
+    opacity: 1;
+    transform: scale(0.95);
+}
+
+/* ゲーム開始時にコントロールを表示するためにhiddenクラスを解除 */
+#controls.hidden {
+    display: none;
+}

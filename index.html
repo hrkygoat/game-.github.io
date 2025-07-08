@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>横スクロールアクションゲーム</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="gameUI">
+        <div id="score">Score: 0</div>
+        <div id="lives">Lives: 3</div>
+    </div>
+
+    <div id="controls" class="hidden">
+        <div id="dpad">
+            <button id="leftButton" class="control-button">&larr;</button>
+            <button id="rightButton" class="control-button">&rarr;</button>
+        </div>
+        <button id="jumpButton" class="control-button">JUMP</button>
+    </div>
+    <div id="startScreen">
+        <h1>Welcome!</h1>
+        <button id="startButton">START GAME</button>
+    </div>
+
+    <div id="gameOverScreen" class="hidden">
+        <h1>はいおまえシボウ(* ´艸｀)ｸｽｸｽ</h1>
+        <button id="continueButton">CONTINUE (3)</button>
+        <button id="restartButton">RESTART</button>
+    </div>
+
+    <audio id="bgm" src="assets/bgm/bgm.mp3" preload="auto" loop></audio>
+    <audio id="jumpSound" src="assets/bgm/jump.wav" preload="auto"></audio>
+    <audio id="hitSound" src="assets/bgm/hit.mp3" preload="auto"></audio>
+    <audio id="enemyHitSound" src="assets/bgm/enemy_hit.wav" preload="auto"></audio>
+    <audio id="collectItemSound" src="assets/bgm/collect_item.wav" preload="auto"></audio>
+
+    <script src="js/game.js"></script>
+</body>
+</html>

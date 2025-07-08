@@ -17,9 +17,9 @@ const rightButton = document.getElementById('rightButton');
 const jumpButton = document.getElementById('jumpButton');
 // ----------------------------------------------------
 
-// キャンバスのサイズを縦長に変更 (例: 幅400px, 高さ600px)
-canvas.width = 400;
-canvas.height = 600;
+// キャンバスのサイズを正方形に変更 (例: 幅500px, 高さ500px)
+canvas.width = 500;
+canvas.height = 500;
 
 // ====================================================================
 // ゲームの状態変数
@@ -44,7 +44,6 @@ const itemSpawnInterval = 5000; // アイテムを生成する間隔 (ミリ秒)
 const bgm = document.getElementById('bgm');
 const jumpSound = document.getElementById('jumpSound');
 const hitSound = document.getElementById('hitSound'); // プレイヤーがダメージを受けた時
-// 修正: 'enemy_hit.wav' ではなく、HTMLで指定されているID 'enemyHitSound' を使用
 const enemyHitSound = document.getElementById('enemyHitSound'); // 敵を倒した時
 const collectItemSound = document.getElementById('collectItemSound'); // アイテム取得時
 
@@ -107,7 +106,8 @@ function loadAssets() {
 // ====================================================================
 const player = {
     x: 100, // プレイヤーのx座標は初期位置。D-padで移動可能になる
-    y: canvas.height - 70, // 元のY位置だが、canvas.heightが変わるため結果的に変更される
+    // プレイヤーのY座標を新しい高さに合わせて調整
+    y: canvas.height - 50 - 50, // canvas.height - player.height - 50 となるように
     width: 50,
     height: 50,
     velocityY: 0,
@@ -147,8 +147,8 @@ const player = {
             ctx.drawImage(currentImage,
                           sx, 0,
                           this.frameWidth, this.frameHeight,
-                          this.x, this.y, // 修正: this,height を this.y に変更
-                          this.width, this.height); // 修正: this,height を this.height に変更
+                          this.x, this.y,
+                          this.width, this.height);
         } else {
             ctx.fillStyle = 'red';
             ctx.fillRect(this.x, this.y, this.width, this.height);
@@ -304,7 +304,7 @@ function spawnEnemy() {
         enemyWidth = 50;
         enemyHeight = 30;
         enemySpeed = 1.5 + Math.random() * 1.5;
-        // 縦長の画面に合わせて飛行敵のY座標範囲を調整
+        // 縦長の画面に合わせて飛行敵のY座標範囲を調整 (500x500でも既存の計算で調整される)
         const flyY = canvas.height * 0.4 + Math.random() * (canvas.height * 0.2);
         const amplitude = 20 + Math.random() * 30;
         const frequency = 0.05 + Math.random() * 0.05;
@@ -346,11 +346,11 @@ class Block {
 let blocks = [];
 
 function setupInitialBlocks() {
-    // 初期ブロックを配置 (新しい縦長画面に合わせて調整)
+    // 初期ブロックを配置 (新しい正方形画面に合わせて調整)
     blocks = []; // リセット時にクリア
-    blocks.push(new Block(100, canvas.height - 150, 100, 30)); // x座標を調整
-    blocks.push(new Block(250, canvas.height - 250, 120, 30)); // x, y座標を調整
-    blocks.push(new Block(450, canvas.height - 150, 80, 30)); // x座標を調整
+    blocks.push(new Block(50, canvas.height - 100, 100, 30)); // x座標、y座標を調整
+    blocks.push(new Block(200, canvas.height - 200, 120, 30)); // x, y座標を調整
+    blocks.push(new Block(350, canvas.height - 100, 80, 30)); // x座標、y座標を調整
 }
 
 
@@ -391,7 +391,7 @@ function spawnItem() {
     const itemWidth = 30;
     const itemHeight = 30;
     const itemX = canvas.width;
-    // 縦長の画面に合わせてアイテムのY座標範囲を調整
+    // 縦長の画面に合わせてアイテムのY座標範囲を調整 (500x500でも既存の計算で調整される)
     const itemY = canvas.height - itemHeight - (Math.random() * 250 + 100);
 
     items.push(new Item(itemX, itemY, itemWidth, itemHeight, 'health'));
@@ -435,7 +435,7 @@ function continueGame() {
         lives = 3;
         score = 0; // スコアもリセット
         player.x = 100; // プレイヤーのX座標をリセット
-        player.y = canvas.height - 70; // プレイヤーのY座標をリセット (新しい高さ基準)
+        player.y = canvas.height - 50 - 50; // プレイヤーのY座標をリセット (新しい高さ基準)
         player.velocityY = 0;
         player.isJumping = false;
         enemies = [];
@@ -456,7 +456,7 @@ function restartGame() {
     lives = 3;
     score = 0;
     player.x = 100; // プレイヤーのX座標をリセット
-    player.y = canvas.height - 70; // プレイヤーのY座標をリセット (新しい高さ基準)
+    player.y = canvas.height - 50 - 50; // プレイヤーのY座標をリセット (新しい高さ基準)
     player.velocityY = 0;
     player.isJumping = false;
     enemies = [];
@@ -551,7 +551,7 @@ function gameLoop(currentTime) {
         const lastBlockY = blocks[blocks.length - 1].y;
 
         const newBlockWidth = 80 + Math.random() * 50;
-        const gap = 80 + Math.random() * 80; // ブロック間の隙間 (幅が狭くなったので少し狭く)
+        const gap = 50 + Math.random() * 50; // ブロック間の隙間を調整
         const newBlockX = lastBlockX + blocks[blocks.length - 1].width + gap;
         let newBlockY = lastBlockY + (Math.random() - 0.5) * 50;
         // 縦長の画面に合わせてブロックのY座標範囲を調整

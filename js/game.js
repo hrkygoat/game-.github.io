@@ -301,8 +301,8 @@ function spawnEnemy() {
         enemySpeed = 2 + Math.random() * 2;
         enemies.push(new Enemy(canvas.width, canvas.height - enemyHeight, enemyWidth, enemyHeight, enemySpeed, assets.enemy.img));
     } else if (random < 0.7) { // 30%の確率で飛行する敵
-        enemyWidth = 50;
-        enemyHeight = 30;
+        enemyWidth = 70;
+        enemyHeight = 50;
         enemySpeed = 1.5 + Math.random() * 1.5;
         // 縦長の画面に合わせて飛行敵のY座標範囲を調整 (500x500でも既存の計算で調整される)
         const flyY = canvas.height * 0.4 + Math.random() * (canvas.height * 0.2);

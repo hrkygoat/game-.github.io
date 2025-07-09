@@ -125,6 +125,52 @@ canvas {
     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
 
+/* Stage Clear Screen Styles (新規追加) */
+#stageClearScreen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 100, 0, 0.8); /* 少し緑がかった背景 */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    z-index: 25; /* Game Overより優先順位を低く、Start Screenより高く */
+}
+
+#stageClearScreen h1 {
+    font-size: 3em;
+    color: #90ee90; /* 明るい緑色 */
+    text-shadow: 4px 4px #006400; /* 濃い緑の影 */
+    margin-bottom: 20px;
+}
+
+#stageClearScreen button {
+    padding: 12px 25px;
+    font-size: 1.5em;
+    cursor: pointer;
+    background-color: #32cd32; /* ライムグリーン */
+    color: white;
+    border: none;
+    border-radius: 6px;
+    transition: background-color 0.3s ease, transform 0.1s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    margin: 5px; /* ボタン間の余白 */
+}
+
+#stageClearScreen button:hover {
+    background-color: #228b22; /* フォレストグリーン */
+    transform: translateY(-2px);
+}
+
+#stageClearScreen button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
 /* 画面の状態に応じて表示/非表示を切り替えるためのクラス */
 .hidden {
     display: none !important;
@@ -132,8 +178,6 @@ canvas {
 
 /* Control Buttons */
 #controls {
-    /* position: absolute; */ /* absoluteを削除 */
-    /* bottom: 20px; */      /* bottomも削除 */
     margin-top: 10px; /* キャンバスとの間に少し隙間を作る */
     width: 100%; /* 幅は維持 */
     display: flex;

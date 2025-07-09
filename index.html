@@ -32,12 +32,21 @@
         <button id="restartButton">RESTART</button>
     </div>
 
+    <div id="stageClearScreen" class="hidden">
+        <h1>STAGE CLEAR!</h1>
+        <button id="nextStageButton">NEXT STAGE</button>
+        <button id="restartFromClearButton">RESTART</button>
+    </div>
+
     <audio id="bgm" src="assets/bgm/bgm.mp3" preload="auto" loop></audio>
+    <audio id="bgmStage2" src="assets/bgm/bgm_stage2.wav" preload="auto" loop></audio>
     <audio id="jumpSound" src="assets/bgm/jump.wav" preload="auto"></audio>
     <audio id="hitSound" src="assets/bgm/hit.mp3" preload="auto"></audio>
     <audio id="enemyHitSound" src="assets/bgm/enemy_hit.wav" preload="auto"></audio>
-    <audio id="collectItemSound" src="assets/bgm/item.wav" preload="auto"></audio>
-
+    <audio id="collectItemSound" src="assets/bgm/collect_item.wav" preload="auto"></audio>
+    <audio id="blockHitSound" src="assets/bgm/block_hit.wav" preload="auto"></audio>
+    <audio id="stageClearSound" src="assets/bgm/stage_clear.wav" preload="auto"></audio>
+    <audio id="shootSound" src="assets/bgm/shoot.wav" preload="auto"></audio>
     <script src="js/game.js"></script>
 </body>
 </html>

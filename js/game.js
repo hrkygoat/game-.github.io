@@ -19,6 +19,11 @@ const stageClearScreen = document.getElementById('stageClearScreen');
 const nextStageButton = document.getElementById('nextStageButton');
 const restartFromClearButton = document.getElementById('restartFromClearButton');
 
+const pauseButton = document.getElementById('pauseButton');
+const pauseScreen = document = document.getElementById('pauseScreen');
+const resumeButton = document.getElementById('resumeButton');
+const restartFromPauseButton = document.getElementById('restartFromPauseButton');
+
 canvas.width = 500;
 canvas.height = 500;
 
@@ -26,12 +31,13 @@ canvas.height = 500;
 // ゲームの状態変数
 // ====================================================================
 let gameRunning = false;
+let isGamePaused = false;
 let score = 0;
 let lives = 3;
 let continueCount = 3;
 let backgroundX = 0;
-const backgroundScrollSpeed = 1;
-let gameSpeed = 1.5; // 強制スクロールの速さ (ステージによって変更)
+const backgroundScrollSpeed = 100; // ピクセル/秒 に調整
+let gameSpeed = 1.5; // 強制スクロールの速さ (ステージによって変更される倍率)
 
 let lastEnemySpawnTime = 0;
 const enemySpawnInterval = 1500;
@@ -51,14 +57,14 @@ let isStageClearItemSpawned = false;
 // オーディオ関連
 // ====================================================================
 const bgm = document.getElementById('bgm');
-const bgmStage2 = document.getElementById('bgmStage2'); // ステージ2 BGMを追加
+const bgmStage2 = document.getElementById('bgmStage2');
 const jumpSound = document.getElementById('jumpSound');
 const hitSound = document.getElementById('hitSound');
 const enemyHitSound = document.getElementById('enemyHitSound');
 const collectItemSound = document.getElementById('collectItemSound');
 const blockHitSound = document.getElementById('blockHitSound');
 const stageClearSound = document.getElementById('stageClearSound');
-const shootSound = document.getElementById('shootSound'); // 射撃音を追加
+const shootSound = document.getElementById('shootSound');
 
 function playSound(audioElement) {
     if (audioElement) {
@@ -70,12 +76,16 @@ function playSound(audioElement) {
 function stopBGM() {
     bgm.pause();
     bgm.currentTime = 0;
-    bgmStage2.pause(); // ステージ2 BGMも停止
+    bgmStage2.pause();
     bgmStage2.currentTime = 0;
 }
 
 function playBGMForCurrentStage() {
-    stopBGM(); // まず全て停止
+    if (isGamePaused) {
+        stopBGM();
+        return;
+    }
+    stopBGM();
     if (currentStage === 1) {
         bgm.play().catch(e => console.warn("BGM play error:", e));
     } else if (currentStage === 2) {
@@ -99,9 +109,9 @@ const assets = {
     invincibilityItem: { img: new Image(), src: 'assets/images/invincibility_item.png' },
     stageClearItem: { img: new Image(), src: 'assets/images/stage_clear_item.png' },
     background: { img: new Image(), src: 'assets/images/background.png' },
-    backgroundStage2: { img: new Image(), src: 'assets/images/background_stage2.png' }, // ステージ2背景
-    shootItem: { img: new Image(), src: 'assets/images/shoot_item.png' }, // 射撃能力アイテム
-    playerProjectile: { img: new Image(), src: 'assets/images/player_projectile.png' }, // プレイヤーの弾
+    backgroundStage2: { img: new Image(), src: 'assets/images/background_stage2.png' },
+    shootItem: { img: new Image(), src: 'assets/images/shoot_item.png' },
+    playerProjectile: { img: new Image(), src: 'assets/images/player_projectile.png' },
 };
 
 let assetsLoadedCount = 0;
@@ -142,9 +152,9 @@ const player = {
     jumpCount: 0,
     maxJumpCount: 2,
     speedX: 0,
-    maxSpeedX: 5,
-    gravity: 0.8,
-    jumpStrength: -15,
+    maxSpeedX: 250, // ピクセル/秒
+    gravity: 1.2,
+    jumpStrength: -500, // ピクセル/秒
 
     currentFrame: 0,
     frameCounter: 0,
@@ -160,11 +170,11 @@ const player = {
     blinkTimer: 0,
     blinkInterval: 50,
 
-    canShoot: false, // 射撃能力を持っているか
+    canShoot: false,
     shootCooldown: 0,
-    maxShootCooldown: 300, // 射撃クールダウン (ミリ秒)
-    projectileSpeed: 10,
-    projectileDamage: 50, // 敵に与えるダメージ
+    maxShootCooldown: 300,
+    projectileSpeed: 500, // ピクセル/秒
+    projectileDamage: 50,
 
     draw() {
         if (this.isInvincible && Math.floor(this.blinkTimer / this.blinkInterval) % 2 === 0) {
@@ -199,23 +209,26 @@ const player = {
     },
 
     update(deltaTime) {
-        if (isGamePausedForDamage) {
+        if (isGamePaused || isGamePausedForDamage) {
             return;
         }
 
-        this.x += this.speedX;
+        // 水平移動をdeltaTimeでスケール
+        this.x += this.speedX * deltaTime / 1000;
         if (this.x < 0) this.x = 0;
         if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
 
-        this.y += this.velocityY;
-        this.velocityY += this.gravity;
+        // 垂直移動と重力をdeltaTimeでスケール
+        this.y += this.velocityY * deltaTime / 1000;
+        this.velocityY += this.gravity * deltaTime;
 
         let onGround = false;
         const groundLevel = canvas.height - this.height;
 
         for (const block of blocks) {
             if (checkCollision(this, block) && this.velocityY >= 0) {
-                if (this.y + this.height - this.velocityY <= block.y) {
+                // ブロックの上に着地
+                if (this.y + this.height - (this.velocityY * deltaTime / 1000) <= block.y) {
                     this.y = block.y - this.height;
                     this.velocityY = 0;
                     this.isJumping = false;
@@ -247,7 +260,6 @@ const player = {
             }
         }
 
-        // 射撃クールダウンの更新
         if (this.shootCooldown > 0) {
             this.shootCooldown -= deltaTime;
         }
@@ -284,7 +296,7 @@ const player = {
         this.isInvincible = true;
         this.invincibleTimer = this.invincibleDuration;
         this.blinkTimer = 0;
-        this.canShoot = false; // ダメージを受けると射撃能力を失う
+        this.canShoot = false;
 
         isGamePausedForDamage = true;
         damagePauseTimer = DAMAGE_PAUSE_DURATION;
@@ -309,14 +321,12 @@ const player = {
         playSound(collectItemSound);
     },
 
-    // 射撃能力を取得
     gainShootAbility() {
         this.canShoot = true;
-        this.shootCooldown = 0; // すぐ撃てるように
-        playSound(collectItemSound); // アイテム取得音
+        this.shootCooldown = 0;
+        playSound(collectItemSound);
     },
 
-    // 射撃メソッド
     shoot() {
         if (this.canShoot && this.shootCooldown <= 0) {
             const projectileWidth = 20;
@@ -340,7 +350,7 @@ class Enemy {
         this.width = width;
         this.height = height;
         this.initialHeight = height;
-        this.speed = speed;
+        this.speed = speed; // ピクセル/秒
         this.image = image;
         this.active = true;
         this.isStomped = false;
@@ -370,7 +380,7 @@ class Enemy {
     }
 
     update(deltaTime) {
-        if (isGamePausedForDamage) {
+        if (isGamePaused || isGamePausedForDamage) {
             return;
         }
         if (this.isStomped) {
@@ -379,7 +389,8 @@ class Enemy {
                 this.active = false;
             }
         } else {
-            this.x -= this.speed * gameSpeed;
+            // 敵の移動をdeltaTimeでスケール
+            this.x -= this.speed * gameSpeed * deltaTime / 1000;
             if (this.x + this.width < 0) {
                 this.active = false;
             }
@@ -395,16 +406,18 @@ class FlyingEnemy extends Enemy {
         super(x, y, width, height, speed, assets.flyingEnemy.img);
         this.startY = y;
         this.amplitude = amplitude;
-        this.frequency = frequency;
+        this.frequency = frequency; // ラジアン/秒
         this.angle = Math.random() * Math.PI * 2;
     }
 
     update(deltaTime) {
         super.update(deltaTime);
-        if (isGamePausedForDamage || this.isStomped) {
+        if (isGamePaused || isGamePausedForDamage || this.isStomped) {
             return;
         }
-        this.angle += this.frequency * gameSpeed;
+        // 飛行移動をdeltaTimeでスケール
+        // frequencyがラジアン/ミリ秒なので、deltaTimeはそのまま乗算
+        this.angle += this.frequency * gameSpeed * deltaTime; // ★修正箇所★
         this.y = this.startY + Math.sin(this.angle) * this.amplitude;
     }
 }
@@ -424,7 +437,6 @@ class Stage2GroundEnemy extends Enemy {
         super(x, y, width, height, speed, assets.stage2Enemy.img);
     }
 }
-// ------------------------------------
 
 let enemies = [];
 
@@ -436,47 +448,47 @@ function spawnEnemy() {
         if (random < 0.4) {
             enemyWidth = 80;
             enemyHeight = 40;
-            enemySpeed = 2 + Math.random() * 2;
+            enemySpeed = 100 + Math.random() * 50; // ピクセル/秒
             enemies.push(new Enemy(canvas.width, canvas.height - enemyHeight, enemyWidth, enemyHeight, enemySpeed, assets.enemy.img));
         } else if (random < 0.7) {
             enemyWidth = 50;
             enemyHeight = 30;
-            enemySpeed = 1.5 + Math.random() * 1.5;
+            enemySpeed = 80 + Math.random() * 40; // ピクセル/秒
             const flyY = canvas.height * 0.4 + Math.random() * (canvas.height * 0.2);
             const amplitude = 20 + Math.random() * 30;
-            const frequency = 0.05 + Math.random() * 0.05;
+            const frequency = 0.00005 + Math.random() * 0.00005; // ラジアン/ミリ秒
             enemies.push(new FlyingEnemy(canvas.width, flyY, enemyWidth, enemyHeight, enemySpeed, amplitude, frequency));
         } else {
             enemyWidth = 80;
             enemyHeight = 110;
-            enemySpeed = 2.5 + Math.random() * 1.5;
+            enemySpeed = 120 + Math.random() * 60; // ピクセル/秒
             enemies.push(new GroundEnemy2(canvas.width, canvas.height - enemyHeight, enemyWidth, enemyHeight, enemySpeed));
         }
     } else if (currentStage === 2) {
         if (random < 0.3) {
             enemyWidth = 80;
             enemyHeight = 40;
-            enemySpeed = 2.5 + Math.random() * 2;
+            enemySpeed = 120 + Math.random() * 60; // ピクセル/秒
             enemies.push(new Enemy(canvas.width, canvas.height - enemyHeight, enemyWidth, enemyHeight, enemySpeed, assets.enemy.img));
         } else if (random < 0.6) {
             enemyWidth = 50;
             enemyHeight = 30;
-            enemySpeed = 2 + Math.random() * 1.5;
+            enemySpeed = 100 + Math.random() * 50; // ピクセル/秒
             const flyY = canvas.height * 0.4 + Math.random() * (canvas.height * 0.2);
             const amplitude = 30 + Math.random() * 30;
-            const frequency = 0.06 + Math.random() * 0.05;
+            const frequency = 0.00006 + Math.random() * 0.00005; // ラジアン/ミリ秒
             enemies.push(new FlyingEnemy(canvas.width, flyY, enemyWidth, enemyHeight, enemySpeed, amplitude, frequency));
         } else {
             enemyWidth = 70;
             enemyHeight = 70;
-            enemySpeed = 3 + Math.random() * 2.5;
+            enemySpeed = 150 + Math.random() * 80; // ピクセル/秒
             enemies.push(new Stage2GroundEnemy(canvas.width, canvas.height - enemyHeight, enemyWidth, enemyHeight, enemySpeed));
         }
     }
 }
 
 // ====================================================================
-// プロジェクタイル（弾丸）オブジェクト (新規追加)
+// プロジェクタイル（弾丸）オブジェクト
 // ====================================================================
 class Projectile {
     constructor(x, y, width, height, speedX, damage, image) {
@@ -484,7 +496,7 @@ class Projectile {
         this.y = y;
         this.width = width;
         this.height = height;
-        this.speedX = speedX;
+        this.speedX = speedX; // ピクセル/秒
         this.damage = damage;
         this.image = image;
         this.active = true;
@@ -501,16 +513,16 @@ class Projectile {
     }
 
     update(deltaTime) {
-        if (isGamePausedForDamage) return; // ゲーム一時停止中は弾も停止
-        this.x += this.speedX;
+        if (isGamePaused || isGamePausedForDamage) return;
+        // 弾丸の移動をdeltaTimeでスケール
+        this.x += this.speedX * deltaTime / 1000;
         if (this.x > canvas.width || this.x < 0) {
             this.active = false;
         }
     }
 }
 
-let projectiles = []; // 弾丸を格納する配列
-// ----------------------------------------------------
+let projectiles = [];
 
 // ====================================================================
 // ブロックオブジェクト
@@ -534,10 +546,11 @@ class Block {
     }
 
     update(deltaTime) {
-        if (isGamePausedForDamage) {
+        if (isGamePaused || isGamePausedForDamage) {
             return;
         }
-        this.x -= backgroundScrollSpeed * gameSpeed;
+        // ブロックの移動をdeltaTimeでスケール
+        this.x -= backgroundScrollSpeed * gameSpeed * deltaTime / 1000;
     }
 }
 
@@ -573,6 +586,9 @@ class BreakableBlock extends Block {
 
     update(deltaTime) {
         super.update(deltaTime);
+        if (isGamePaused || isGamePausedForDamage) {
+            return;
+        }
         if (this.isBroken) {
             this.breakTimer -= deltaTime;
             if (this.breakTimer <= 0) {
@@ -601,31 +617,27 @@ class BreakableBlock extends Block {
 let blocks = [];
 
 // ====================================================================
-// ステージの要素をセットアップする関数 (新しい関数)
+// ステージの要素をセットアップする関数
 // ====================================================================
 function setupStageElements(stageNum) {
-    blocks = []; // ブロックをリセット
+    blocks = [];
 
-    // ステージごとの設定
     if (stageNum === 1) {
-        gameSpeed = 1.5;
-        // ステージ1の初期ブロック配置
+        gameSpeed = 1.0;
         blocks.push(new Block(50, canvas.height - 100, 100, 30));
         blocks.push(new Block(200, canvas.height - 200, 120, 30));
         blocks.push(new Block(350, canvas.height - 100, 80, 30));
     } else if (stageNum === 2) {
-        gameSpeed = 2.0; // ステージ2は少し速く
-        // ステージ2の初期ブロック配置
+        gameSpeed = 1.5;
         blocks.push(new Block(50, canvas.height - 120, 80, 30));
         blocks.push(new BreakableBlock(180, canvas.height - 220, 60, 30, true, 'health'));
         blocks.push(new Block(300, canvas.height - 150, 100, 30));
         blocks.push(new Block(450, canvas.height - 250, 70, 30));
     }
-    // 注意: ここではプレイヤーの状態、敵、アイテム、スコア、ライフはリセットしません。
 }
 
 // ====================================================================
-// プレイヤーとステージコンテンツをリセットする関数 (新しい関数)
+// プレイヤーとステージコンテンツをリセットする関数
 // ====================================================================
 function resetPlayerAndStageContent() {
     player.x = 100;
@@ -635,29 +647,28 @@ function resetPlayerAndStageContent() {
     player.jumpCount = player.maxJumpCount;
     player.isInvincible = false;
     player.invincibleTimer = 0;
-    player.canShoot = false; // 射撃能力もリセット
+    player.canShoot = false;
 
-    enemies = []; // 敵をリセット
-    items = [];   // アイテムをリセット
-    projectiles = []; // 弾丸をリセット
-    isStageClearItemSpawned = false; // ステージクリアアイテムもリセット
-    backgroundX = 0; // 背景スクロール位置をリセット
+    enemies = [];
+    items = [];
+    projectiles = [];
+    isStageClearItemSpawned = false;
+    backgroundX = 0;
 }
 
 // ====================================================================
-// ゲーム全体を初期状態にリセットする関数 (旧 resetGameToInitialState)
+// ゲーム全体を初期状態にリセットする関数
 // ====================================================================
 function resetFullGame() {
     score = 0;
     lives = 3;
-    continueCount = 3; // コンティニュー回数もリセット
+    continueCount = 3;
     currentStage = 1;
-    setupStageElements(currentStage); // ステージ1の要素をセットアップ
-    resetPlayerAndStageContent(); // プレイヤーとステージコンテンツをリセット
-    updateUI(); // UIを更新
-    stopBGM(); // BGMを停止
+    setupStageElements(currentStage);
+    resetPlayerAndStageContent();
+    updateUI();
+    stopBGM();
 }
-// ------------------------------------
 
 // ====================================================================
 // アイテムオブジェクト
@@ -675,7 +686,7 @@ class Item {
             this.image = assets.invincibilityItem.img;
         } else if (type === 'stage_clear') {
             this.image = assets.stageClearItem.img;
-        } else if (type === 'shoot_ability') { // 射撃能力アイテムの画像
+        } else if (type === 'shoot_ability') {
             this.image = assets.shootItem.img;
         }
         this.active = true;
@@ -689,16 +700,17 @@ class Item {
             if (this.type === 'health') ctx.fillStyle = 'pink';
             else if (this.type === 'invincibility') ctx.fillStyle = 'gray';
             else if (this.type === 'stage_clear') ctx.fillStyle = 'gold';
-            else if (this.type === 'shoot_ability') ctx.fillStyle = 'purple'; // 新アイテムのフォールバック色
+            else if (this.type === 'shoot_ability') ctx.fillStyle = 'purple';
             ctx.fillRect(this.x, this.y, this.width, this.height);
         }
     }
 
-    update() {
-        if (isGamePausedForDamage) {
+    update(deltaTime) {
+        if (isGamePaused || isGamePausedForDamage) {
             return;
         }
-        this.x -= backgroundScrollSpeed * gameSpeed;
+        // アイテムの移動をdeltaTimeでスケール
+        this.x -= backgroundScrollSpeed * gameSpeed * deltaTime / 1000;
         if (this.x + this.width < 0) {
             this.active = false;
         }
@@ -719,12 +731,11 @@ function spawnItem() {
     if (currentStage === 1) {
         itemType = random < 0.7 ? 'health' : 'invincibility';
     } else if (currentStage === 2) {
-        // ステージ2では射撃能力アイテムも出現
-        if (random < 0.5) { // 50% 回復
+        if (random < 0.5) {
             itemType = 'health';
-        } else if (random < 0.8) { // 30% 無敵
+        } else if (random < 0.8) {
             itemType = 'invincibility';
-        } else { // 20% 射撃能力
+        } else {
             itemType = 'shoot_ability';
         }
     }
@@ -763,6 +774,7 @@ function gameOver() {
     stopBGM();
     gameOverScreen.classList.remove('hidden');
     controlsDiv.classList.add('hidden');
+    pauseButton.classList.add('hidden');
     updateContinueButton();
 }
 
@@ -782,9 +794,12 @@ function updateContinueButton() {
 function startGameLoop() {
     gameOverScreen.classList.add('hidden');
     stageClearScreen.classList.add('hidden');
+    pauseScreen.classList.add('hidden');
     controlsDiv.classList.remove('hidden');
+    pauseButton.classList.remove('hidden');
     gameRunning = true;
-    playBGMForCurrentStage(); // 現在のステージのBGMを再生
+    isGamePaused = false;
+    playBGMForCurrentStage();
     lastFrameTime = performance.now();
     requestAnimationFrame(gameLoop);
 }
@@ -792,17 +807,17 @@ function startGameLoop() {
 function continueGame() {
     if (continueCount > 0) {
         continueCount--;
-        lives = 3; // ライフを全回復
-        resetPlayerAndStageContent(); // プレイヤーとステージ上のコンテンツをリセット
-        setupStageElements(currentStage); // 現在のステージのブロックを再配置 (念のため)
-        updateUI(); // UIを更新
-        startGameLoop(); // ゲームループを再開
+        lives = 3;
+        resetPlayerAndStageContent();
+        setupStageElements(currentStage);
+        updateUI();
+        startGameLoop();
     }
 }
 
 function restartGame() {
-    resetFullGame(); // ゲームを完全にリセット
-    startGameLoop(); // ゲームループを開始
+    resetFullGame();
+    startGameLoop();
 }
 
 function stageClear() {
@@ -811,26 +826,65 @@ function stageClear() {
     playSound(stageClearSound);
     stageClearScreen.classList.remove('hidden');
     controlsDiv.classList.add('hidden');
+    pauseButton.classList.add('hidden');
 
     if (currentStage < MAX_STAGES) {
         nextStageButton.textContent = "NEXT STAGE";
         nextStageButton.disabled = false;
         nextStageButton.onclick = startNextStage;
     } else {
-        nextStageButton.textContent = "GAME COMPLETE!";
-        nextStageButton.disabled = true;
+        // === ここから変更 ===
+        nextStageButton.textContent = "Next stage"; // ボタンのテキストを変更
+        nextStageButton.disabled = false; // ボタンを無効にしない
+        // 既存のイベントリスナーを削除し、新しいイベントリスナーを追加
+        nextStageButton.onclick = null; // 既存のイベントハンドラをクリア
+        nextStageButton.addEventListener('click', () => {
+            window.open('https://hrkygoat.github.io/game1-2.github.io/', '_blank'); // 例としてGoogleのURLを設定
+            // TODO: 上の 'https://www.google.com' を実際のリダイレクト先URLに置き換えてください。
+        }, { once: true }); // 一度だけ実行されるように設定
+        // === ここまで変更 ===
     }
 }
 
 function startNextStage() {
     if (currentStage < MAX_STAGES) {
-        currentStage++;
-        lives = 3; // 新しいステージではライフを全回復
-        setupStageElements(currentStage); // 新しいステージの要素をセットアップ
+        currentStage++; // 次のステージに進む
+        lives = 3; // ライフをリセット
+        // ★★★ 修正箇所: resetFullGame() を削除し、必要なリセットのみ行う ★★★
+        setupStageElements(currentStage); // 新しいステージの要素を設定
         resetPlayerAndStageContent(); // プレイヤーとステージコンテンツをリセット
         updateUI(); // UIを更新
-        startGameLoop();
+        startGameLoop(); // ゲームループを開始
     }
+}
+
+// ポーズ機能関連の関数
+function togglePause() {
+    if (!gameRunning) return;
+
+    isGamePaused = !isGamePaused;
+    if (isGamePaused) {
+        pauseScreen.classList.remove('hidden');
+        controlsDiv.classList.add('hidden');
+        pauseButton.classList.add('hidden');
+        stopBGM();
+    } else {
+        pauseScreen.classList.add('hidden');
+        controlsDiv.classList.remove('hidden');
+        pauseButton.classList.remove('hidden');
+        playBGMForCurrentStage();
+        lastFrameTime = performance.now();
+        requestAnimationFrame(gameLoop);
+    }
+}
+
+function resumeGame() {
+    togglePause();
+}
+
+function restartGameFromPause() {
+    togglePause();
+    restartGame();
 }
 
 // ====================================================================
@@ -844,15 +898,15 @@ function updateUI() {
 let lastFrameTime = 0;
 
 // ====================================================================
-// ゲームループ
+// ゲームループ (ポーズ状態を考慮)
 // ====================================================================
 function gameLoop(currentTime) {
     if (!gameRunning) return;
 
-    if (lastFrameTime === 0) {
+    if (lastFrameTime === 0 || isGamePaused) {
         lastFrameTime = currentTime;
     }
-    const deltaTime = currentTime - lastFrameTime;
+    const deltaTime = currentTime - lastFrameTime; // ミリ秒単位
     lastFrameTime = currentTime;
 
     if (isGamePausedForDamage) {
@@ -864,18 +918,19 @@ function gameLoop(currentTime) {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 背景の描画とスクロール (ステージごとに背景を切り替え)
+    // 背景の描画とスクロール (ポーズ中はスクロール停止)
     let currentBackground = (currentStage === 1) ? assets.background.img : assets.backgroundStage2.img;
-    if (!isGamePausedForDamage) {
+    if (!isGamePaused && !isGamePausedForDamage) {
         if (currentBackground.complete && currentBackground.naturalHeight !== 0) {
             ctx.drawImage(currentBackground, backgroundX, 0, canvas.width, canvas.height);
             ctx.drawImage(currentBackground, backgroundX + canvas.width, 0, canvas.width, canvas.height);
-            backgroundX -= backgroundScrollSpeed * gameSpeed;
+            // 背景のスクロールをdeltaTimeでスケール
+            backgroundX -= backgroundScrollSpeed * gameSpeed * deltaTime / 1000;
             if (backgroundX <= -canvas.width) {
                 backgroundX = 0;
             }
         } else {
-            ctx.fillStyle = (currentStage === 1) ? 'skyblue' : 'darkblue'; // フォールバック色
+            ctx.fillStyle = (currentStage === 1) ? 'skyblue' : 'darkblue';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
     } else {
@@ -888,145 +943,150 @@ function gameLoop(currentTime) {
         }
     }
 
-    player.update(deltaTime);
-    player.draw();
+    // ポーズ中、ダメージポーズ中はオブジェクトのupdateをスキップ
+    if (!isGamePaused && !isGamePausedForDamage) {
+        player.update(deltaTime);
 
-    if (player.y > canvas.height + 50) {
-        player.takeDamage();
-        // 落下によるダメージの場合、プレイヤーを安全な位置に戻す
-        if (lives > 0) { // まだライフがある場合のみ
-            player.x = 100;
-            player.y = canvas.height - player.height;
-            player.velocityY = 0;
-            player.isJumping = false;
-            player.jumpCount = player.maxJumpCount;
-        }
-    }
-
-    if (!isGamePausedForDamage && currentTime - lastEnemySpawnTime > enemySpawnInterval) {
-        spawnEnemy();
-        lastEnemySpawnTime = currentTime;
-    }
-
-    enemies = enemies.filter(enemy => enemy.active || enemy.isStomped);
-    enemies.forEach(enemy => {
-        enemy.update(deltaTime);
-        enemy.draw();
-
-        if (checkCollision(player, enemy) && !enemy.isStomped) {
-            const playerBottom = player.y + player.height;
-            const enemyTop = enemy.y;
-
-            if (player.velocityY > 0 && playerBottom < enemyTop + enemy.height / 2) {
-                enemy.isStomped = true;
-                enemy.stompedTimer = enemy.stompedDuration;
-                score += 100;
-                playSound(enemyHitSound);
-                player.velocityY = player.jumpStrength / 2;
-                player.isJumping = true;
-            } else {
-                player.takeDamage();
+        if (player.y > canvas.height + 50) {
+            player.takeDamage();
+            if (lives > 0) {
+                player.x = 100;
+                player.y = canvas.height - player.height;
+                player.velocityY = 0;
+                player.isJumping = false;
+                player.jumpCount = player.maxJumpCount;
             }
         }
-    });
 
-    // プロジェクタイル (弾丸) の更新と描画、衝突判定
-    projectiles = projectiles.filter(p => p.active);
-    projectiles.forEach(p => {
-        p.update(deltaTime);
-        p.draw();
+        if (currentTime - lastEnemySpawnTime > enemySpawnInterval) {
+            spawnEnemy();
+            lastEnemySpawnTime = currentTime;
+        }
 
+        enemies = enemies.filter(enemy => enemy.active || enemy.isStomped);
         enemies.forEach(enemy => {
-            if (enemy.active && !enemy.isStomped && checkCollision(p, enemy)) {
-                // 弾が敵に当たったら、弾と敵を非アクティブ化 (消す)
-                p.active = false;
-                enemy.active = false; // 敵が消える
-                score += 150; // 弾で倒した場合のスコア
-                playSound(enemyHitSound); // 敵を倒した音
+            enemy.update(deltaTime);
+            
+            if (checkCollision(player, enemy) && !enemy.isStomped) {
+                const playerBottom = player.y + player.height;
+                const enemyTop = enemy.y;
+
+                if (player.velocityY > 0 && playerBottom < enemyTop + enemy.height / 2) {
+                    enemy.isStomped = true;
+                    enemy.stompedTimer = enemy.stompedDuration;
+                    score += 100;
+                    playSound(enemyHitSound);
+                    player.velocityY = player.jumpStrength / 2;
+                    player.isJumping = true;
+                } else {
+                    player.takeDamage();
+                }
             }
         });
-    });
 
+        projectiles = projectiles.filter(p => p.active);
+        projectiles.forEach(p => {
+            p.update(deltaTime);
+            enemies.forEach(enemy => {
+                if (enemy.active && !enemy.isStomped && checkCollision(p, enemy)) {
+                    p.active = false;
+                    enemy.active = false;
+                    score += 150;
+                    playSound(enemyHitSound);
+                }
+            });
+        });
 
-    blocks = blocks.filter(block => block.x + block.width > 0 && !(block instanceof BreakableBlock && block.isBroken && block.breakTimer <= 0));
-    blocks.forEach(block => {
-        block.update(deltaTime);
-        block.draw();
-    });
+        blocks = blocks.filter(block => block.x + block.width > 0 && !(block instanceof BreakableBlock && block.isBroken && block.breakTimer <= 0));
+        blocks.forEach(block => {
+            block.update(deltaTime);
+        });
 
-    if (!isGamePausedForDamage && blocks.length > 0 && blocks[blocks.length - 1].x < canvas.width * 0.8) {
-        const lastBlock = blocks[blocks.length - 1];
-        const newBlockWidth = 80 + Math.random() * 50;
-        const gap = 50 + Math.random() * 50;
-        const newBlockX = lastBlock.x + lastBlock.width + gap;
-        let newBlockY = lastBlock.y + (Math.random() - 0.5) * 50;
-        newBlockY = Math.max(canvas.height - 400, Math.min(canvas.height - 50, newBlockY));
+        if (blocks.length > 0 && blocks[blocks.length - 1].x < canvas.width * 0.8) {
+            const lastBlock = blocks[blocks.length - 1];
+            const newBlockWidth = 80 + Math.random() * 50;
+            const gap = 50 + Math.random() * 50;
+            const newBlockX = lastBlock.x + lastBlock.width + gap;
+            let newBlockY = lastBlock.y + (Math.random() - 0.5) * 50;
+            newBlockY = Math.max(canvas.height - 400, Math.min(canvas.height - 50, newBlockY));
 
-        const blockTypeRoll = Math.random();
-        if (blockTypeRoll < 0.25) {
-            const hasItem = Math.random() < 0.8;
-            const itemType = Math.random() < 0.5 ? 'health' : 'invincibility';
-            blocks.push(new BreakableBlock(newBlockX, newBlockY, newBlockWidth, 30, hasItem, itemType));
-        } else {
-            blocks.push(new Block(newBlockX, newBlockY, newBlockWidth, 30));
+            const blockTypeRoll = Math.random();
+            if (blockTypeRoll < 0.25) {
+                const hasItem = Math.random() < 0.8;
+                const itemType = Math.random() < 0.5 ? 'health' : 'invincibility';
+                blocks.push(new BreakableBlock(newBlockX, newBlockY, newBlockWidth, 30, hasItem, itemType));
+            } else {
+                blocks.push(new Block(newBlockX, newBlockY, newBlockWidth, 30));
+            }
         }
-    }
 
-    for (const block of blocks) {
-        if (block instanceof BreakableBlock && !block.isBroken) {
-            if (player.velocityY < 0 && checkCollision(player, block)) {
-                if (player.y < block.y + block.height && player.y + player.height > block.y + block.height) {
-                    block.hitFromBelow();
-                    player.velocityY = 0;
-                    player.y = block.y + block.height;
+        for (const block of blocks) {
+            if (block instanceof BreakableBlock && !block.isBroken) {
+                if (player.velocityY < 0 && checkCollision(player, block)) {
+                    if (player.y < block.y + block.height && player.y + player.height > block.y + block.height) {
+                        block.hitFromBelow();
+                        player.velocityY = 0;
+                        player.y = block.y + block.height;
+                    }
                 }
             }
         }
-    }
 
-    if (!isStageClearItemSpawned && score >= getStageClearScore()) {
-        const itemWidth = 40;
-        const itemHeight = 40;
-        const itemX = canvas.width + 100;
-        const itemY = canvas.height - itemHeight - 100;
-        items.push(new Item(itemX, itemY, itemWidth, itemHeight, 'stage_clear'));
-        isStageClearItemSpawned = true;
-    }
-
-    items = items.filter(item => item.active);
-    items.forEach(item => {
-        item.update();
-        item.draw();
-
-        if (checkCollision(player, item)) {
-            if (item.type === 'health') {
-                player.heal();
-            } else if (item.type === 'invincibility') {
-                player.gainInvincibility();
-            } else if (item.type === 'shoot_ability') { // 射撃能力アイテム取得
-                player.gainShootAbility();
-            } else if (item.type === 'stage_clear') {
-                item.active = false;
-                stageClear();
-                return;
-            }
-            item.active = false;
+        if (!isStageClearItemSpawned && score >= getStageClearScore()) {
+            const itemWidth = 40;
+            const itemHeight = 40;
+            const itemX = canvas.width + 100;
+            const itemY = canvas.height - itemHeight - 100;
+            items.push(new Item(itemX, itemY, itemWidth, itemHeight, 'stage_clear'));
+            isStageClearItemSpawned = true;
         }
-    });
 
-    if (!isGamePausedForDamage) {
+        items = items.filter(item => item.active);
+        items.forEach(item => {
+            item.update(deltaTime);
+            
+            if (checkCollision(player, item)) {
+                if (item.type === 'health') {
+                    player.heal();
+                } else if (item.type === 'invincibility') {
+                    player.gainInvincibility();
+                } else if (item.type === 'shoot_ability') {
+                    player.gainShootAbility();
+                } else if (item.type === 'stage_clear') {
+                    item.active = false;
+                    stageClear();
+                    return;
+                }
+                item.active = false;
+            }
+        });
+
         score++;
     }
+
+    player.draw();
+    enemies.forEach(enemy => enemy.draw());
+    projectiles.forEach(p => p.draw());
+    blocks.forEach(block => block.draw());
+    items.forEach(item => item.draw());
+
     updateUI();
 
     requestAnimationFrame(gameLoop);
 }
 
 // ====================================================================
-// イベントリスナー
+// イベントリスナー (キーボードとボタン)
 // ====================================================================
 document.addEventListener('keydown', (e) => {
-    if (!gameRunning || isGamePausedForDamage) return;
+    if (!gameRunning) return;
+
+    if (e.code === 'Escape') {
+        togglePause();
+        return;
+    }
+
+    if (isGamePaused || isGamePausedForDamage) return;
 
     if (e.code === 'Space' || e.code === 'ArrowUp') {
         player.jump();
@@ -1037,69 +1097,70 @@ document.addEventListener('keydown', (e) => {
     if (e.code === 'ArrowLeft') {
         player.speedX = -player.maxSpeedX;
     }
-    if (e.code === 'KeyX') { // 'X' キーで射撃
+    if (e.code === 'KeyX') {
         player.shoot();
     }
 });
 
 document.addEventListener('keyup', (e) => {
-    if (!gameRunning || isGamePausedForDamage) return;
+    if (!gameRunning || isGamePaused || isGamePausedForDamage) return;
 
     if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') {
         player.speedX = 0;
     }
 });
 
+// 各コントロールボタンのイベントリスナー
 leftButton.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    if (gameRunning && !isGamePausedForDamage) player.speedX = -player.maxSpeedX;
+    if (gameRunning && !isGamePaused && !isGamePausedForDamage) player.speedX = -player.maxSpeedX;
 });
 leftButton.addEventListener('touchend', (e) => {
     e.preventDefault();
-    if (gameRunning && !isGamePausedForDamage) player.speedX = 0;
+    if (gameRunning && !isGamePaused && !isGamePausedForDamage) player.speedX = 0;
 });
 leftButton.addEventListener('mousedown', (e) => {
-    if (gameRunning && !isGamePausedForDamage) player.speedX = -player.maxSpeedX;
+    if (gameRunning && !isGamePaused && !isGamePausedForDamage) player.speedX = -player.maxSpeedX;
 });
 leftButton.addEventListener('mouseup', (e) => {
-    if (gameRunning && !isGamePausedForDamage) player.speedX = 0;
+    if (gameRunning && !isGamePaused && !isGamePausedForDamage) player.speedX = 0;
 });
 leftButton.addEventListener('mouseleave', (e) => {
-    if (gameRunning && !isGamePausedForDamage && e.buttons === 0) player.speedX = 0;
+    if (gameRunning && !isGamePaused && !isGamePausedForDamage && e.buttons === 0) player.speedX = 0;
 });
 
 rightButton.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    if (gameRunning && !isGamePausedForDamage) player.speedX = player.maxSpeedX;
+    if (gameRunning && !isGamePaused && !isGamePausedForDamage) player.speedX = player.maxSpeedX;
 });
 rightButton.addEventListener('touchend', (e) => {
     e.preventDefault();
-    if (gameRunning && !isGamePausedForDamage) player.speedX = 0;
+    if (gameRunning && !isGamePaused && !isGamePausedForDamage) player.speedX = 0;
 });
 rightButton.addEventListener('mousedown', (e) => {
-    if (gameRunning && !isGamePausedForDamage) player.speedX = player.maxSpeedX;
+    if (gameRunning && !isGamePaused && !isGamePausedForDamage) player.speedX = player.maxSpeedX;
 });
 rightButton.addEventListener('mouseup', (e) => {
-    if (gameRunning && !isGamePausedForDamage) player.speedX = 0;
+    if (gameRunning && !isGamePaused && !isGamePausedForDamage) player.speedX = 0;
 });
 rightButton.addEventListener('mouseleave', (e) => {
-    if (gameRunning && !isGamePausedForDamage && e.buttons === 0) player.speedX = 0;
+    if (gameRunning && !isGamePaused && !isGamePausedForDamage && e.buttons === 0) player.speedX = 0;
 });
 
 jumpButton.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    if (gameRunning && !isGamePausedForDamage) player.jump();
+    if (gameRunning && !isGamePaused && !isGamePausedForDamage) player.jump();
 });
 jumpButton.addEventListener('mousedown', (e) => {
-    if (gameRunning && !isGamePausedForDamage) player.jump();
+    if (gameRunning && !isGamePaused && !isGamePausedForDamage) player.jump();
 });
-
 
 startButton.addEventListener('click', () => {
     if (assetsLoadedCount === totalAssets) {
         startScreen.classList.add('hidden');
         controlsDiv.classList.remove('hidden');
-        resetFullGame(); // ゲームを完全にリセット
+        pauseButton.classList.remove('hidden');
+        resetFullGame();
         startGameLoop();
     } else {
         console.log("Assets are still loading. Please wait...");
@@ -1111,6 +1172,11 @@ restartButton.addEventListener('click', restartGame);
 
 nextStageButton.addEventListener('click', startNextStage);
 restartFromClearButton.addEventListener('click', restartGame);
+
+// ポーズ画面のボタンリスナー
+pauseButton.addEventListener('click', togglePause);
+resumeButton.addEventListener('click', resumeGame);
+restartFromPauseButton.addEventListener('click', restartGameFromPause);
 
 // ====================================================================
 // ゲームの初期化 (DOMがロードされたらアセット読み込みを開始)

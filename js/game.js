@@ -839,7 +839,7 @@ function stageClear() {
         // 既存のイベントリスナーを削除し、新しいイベントリスナーを追加
         nextStageButton.onclick = null; // 既存のイベントハンドラをクリア
         nextStageButton.addEventListener('click', () => {
-            window.open('https://hrkygoat.github.io/game1-2.github.io/', '_blank'); // 例としてGoogleのURLを設定
+            window.open('https://hrkygoat.github.io/game1-2.github.io/'); // 例としてGoogleのURLを設定
             // TODO: 上の 'https://www.google.com' を実際のリダイレクト先URLに置き換えてください。
         }, { once: true }); // 一度だけ実行されるように設定
         // === ここまで変更 ===
